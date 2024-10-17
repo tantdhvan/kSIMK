@@ -11,32 +11,42 @@ The $k$-submodular optimization problems have been an active research area with 
     We validate our algorithm in two applications of the studied problem, including revenue maximization and sensor placement on some benchmark datasets. The experiment results show that our streaming algorithm provides higher-quality solutions with lower query complexity than the existing based-line algorithm.
 
 ## Algorithms Included
-
-- **StrOpt**: A streaming algorithm with known optimal values.
 - **Str**: The primary streaming algorithm that does not assume knowledge of the optimal values.
+- **Greedy**: The Greedy algorithm.
   
 Both algorithms are tested and evaluated through experiments on real-world datasets.
 
 ### Dependencies
 
 - GCC (g++), GNU Make
-- Python 3 (with `matplotlib` for plotting results)
 
 
 ### Running the Algorithms
 
-**Đối với ứng dụng $k$-type Product Revenue Maximization Under Individual Knapsack Constraint ($\kPMIK$):**
+**For $k$-type Product Revenue Maximization Under Individual Knapsack Constraint ($kPMIK$):**
 ```bash
 cd revenue_max
 make
-./revmax -g <input file> -b <budget> -G -e <epsilon>
+./revmax -g <input file> -b <budget> -G -e <epsilon> // for Greedy
+./revmax -g <input file> -b <budget> -Q -e <epsilon> // for Str
 ```
 **Example:**
 ```bash
 ./revmax -g data/astro.bin -b 0.01 -q -G -e 0.1
 ./revmax -g data/astro.bin -b 0.01 -q -Q -e 0.1
 ```
-
+**For k-type Sensor Placement under Individual Knapsack constraint($kSPIK$)**
+```bash
+cd sensor
+make
+./sensor -f <input file> -V 54 -t 1 -a 0 -e <epsilon> -B <budget> //for Greedy
+./sensor -f <input file> -V 54 -t 1 -a 5 -e <epsilon> -B <budget> //for Str
+```
+**Example:**
+```bash
+./sensor -f data/datasensor.txt -V 54 -t 1 -a 0 -e 0.1 -B 10
+./sensor -f data/datasensor.txt -V 54 -t 1 -a 5 -e 0.1 -B 10
+```
 ### Results
 
 The paper includes experiments with the following datasets:
