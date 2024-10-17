@@ -39,6 +39,7 @@ make
 ```bash
 cd sensor
 make
+g++ -std=c++11 src/*.cpp -o sensor -DIL_STD -fopenmp -g
 ./sensor -f <input file> -V 54 -t 1 -a 0 -e <epsilon> -B <budget> //for Greedy
 ./sensor -f <input file> -V 54 -t 1 -a 5 -e <epsilon> -B <budget> //for Str
 ```
