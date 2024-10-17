@@ -2,7 +2,7 @@
 
 This repository contains the reference implementation for the paper:
 
-**Tran, T.D., Pham, C.V., & Ha, D.T.K. k-Submodular Maximization under Individual Knapsack Constraint: Applications and Streaming.**
+**Tan D. Tran, Canh V. Pham, & Dung T.K. Ha. k-Submodular Maximization under Individual Knapsack Constraint: Applications and Streaming.**
 
 The paper explores the problem of k-submodular maximization under individual knapsack constraints (kSMIK) with applications in revenue maximization and sensor placement. It introduces a novel streaming algorithm that achieves a constant approximation ratio while operating with minimal query complexity and space consumption. 
 
