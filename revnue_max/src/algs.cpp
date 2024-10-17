@@ -422,18 +422,15 @@ public:
 		{
 			int i_max = -1, e_max = -1;
 			double delta = 0;
-			#pragma omp parallel for
 			for (int e = 0; e < no_nodes; e++)
 			{
 				if (v[e] == true) continue;
-				#pragma omp parallel for
 				for (int i = 0; i < g.k; i++)
 				{
 					if (C_S[i] + g.adjList[e].wht > B) continue;
 					double tmp_delta = marge(nEvals, g, seedsf, kpoint(e, i))/ g.adjList[e].wht;
 					if (tmp_delta > delta)
 					{
-						#pragma omp critical
 						{
 							e_max = e;
 							i_max = i;
@@ -487,7 +484,6 @@ public:
 		{
 			int i_m = -1;
 			double f_i = -1;
-			#pragma omp parallel for
 			for (int i = 0; i < g.k; i++)
 			{
 				vector<kpoint> tmp_seeds1;
@@ -495,7 +491,6 @@ public:
 
 				if (tmp_f > f_i)
 				{
-					#pragma omp critical
 					{
 						i_m = i;
 						f_i = tmp_f;
@@ -530,21 +525,18 @@ public:
 				}
 			}
 
-			#pragma omp parallel for
 			for (int t = 0; t < nguong.size(); t++)
 			{
 				myType &nguongt = nguong[t];
 				if (nguongt.nguongd < f_e_i_max) continue;
 				double delta=0;
 				int iv_max = -1;
-				#pragma omp parallel for
 				for (int i = 0; i < g.k; i++)
 				{
 					if (nguongt.cost[i] + g.adjList[e].wht > B) continue;
 					double tmp_delta = marge(nEvals, g, nguongt.s, kpoint(e, i));
 					if (tmp_delta > delta)
 					{
-						#pragma opm critical
 						{
 							iv_max = i;
 							delta = tmp_delta;
@@ -555,7 +547,6 @@ public:
 				{
 					if (delta >= g.adjList[e].wht * alpha * nguongt.nguongd / B)
 					{
-						#pragma omp critical
 						{
 							nguongt.s.push_back(kpoint(e, iv_max));
 							nguongt.cost[iv_max] += g.adjList[e].wht;
@@ -567,7 +558,6 @@ public:
 		}
 		for (int e = 0; e < no_nodes; e++)
 		{
-			#pragma omp parallel for
 			for (int t = 0; t < nguong.size(); t++)
 			{
 				myType &nguongt = nguong[t];
@@ -575,7 +565,6 @@ public:
 				if (nguongt.check[e] == true) continue;
 				int imax = -1;
 				double delta = 0;
-				#pragma omp parallel for
 				for (int i = 0; i < g.k; i++)
 				{
 					if (nguongt.cost[i] + g.adjList[e].wht > B) continue;
@@ -591,7 +580,6 @@ public:
 				}
 				if (imax != -1)
 				{
-					#pragma omp critical
 					{
 						nguongt.s.push_back(kpoint(e, imax));
 						nguongt.cost[imax] += g.adjList[e].wht;
@@ -602,14 +590,12 @@ public:
 		}
 		double result = 0;
 		int k_max = -1;
-		#pragma omp parallel for
 		for (int i = 0; i < nguong.size(); i++)
 		{
 			if(nguong[i].nguongd < f_e_i_max) continue;
 			double f_tmp=compute_valSet(nEvals, g, nguong[i].s);
 			if (f_tmp > result)
 			{
-				#pragma omp critical
 				{
 					result = f_tmp;
 				}

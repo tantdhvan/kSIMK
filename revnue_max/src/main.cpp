@@ -14,19 +14,11 @@ void print_help()
    cout << "Options: " << endl;
    cout << "-g <graph filename in binary format>" << endl
         << "-k <cardinality constraint>" << endl
-        << "-G [run StandardGreedy]" << endl
-        << "-S [run SieveStream++]" << endl
-        << "-P [run P-Pass]" << endl
-        << "-L [run LTL]" << endl
-        << "-Q [run QuickStream]" << endl
-        << "-R [run QS + BR]" << endl
-        << "-K [run Chakrabarti&Kale]" << endl
+        << "-G [run Greedy]" << endl       
+        << "-Q [run Str]" << endl       
         << "-o <outputFileName>" << endl
         << "-N <repetitions>" << endl
         << "-e <accuracy parameter epsilon (default 0.1)>" << endl
-        << "-p [Only with -Q, run QuickStream++]" << endl
-        << "-t <Tradeoff in error, only applies to P-Pass>" << endl
-        << "-c <blocksize, only applies to QuickStream(++)>" << endl
         << "-q [quiet mode]" << endl;
 }
 
@@ -68,7 +60,6 @@ void parseArgs(int argc, char **argv, Args &arg)
             arg.outputFileName = sarg;
             break;
          case 'g':
-            // graph specification
             arg.graphFileName.assign(optarg);
             break;
          case 'k':
@@ -137,7 +128,7 @@ void runAlg(Args &args)
       {
          case SG:
          {
-            args.logg(INFO, "Starting StandardGreedy...");
+            args.logg(INFO, "Starting Greedy...");
             Sg sg(args);
             sg.run();
          }
@@ -171,7 +162,6 @@ void outputResults(Args &args)
    }
    else
    {
-      // allResults.print( cout, false );
       allResults.print("obj");
       cout << ' ';
       allResults.print("nEvals");
