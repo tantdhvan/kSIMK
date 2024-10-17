@@ -1,4 +1,3 @@
-```markdown
 # k-Submodular Maximization under Individual Knapsack Constraint
 
 This repository contains the reference implementation for the paper:
