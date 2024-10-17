@@ -1,4 +1,4 @@
-# k-Submodular Maximization under Individual Knapsack Constraint
+# k-Submodular Maximization under Individual Knapsack Constraint: Applications and Streaming.
 
 This repository contains the reference implementation for the paper:
 
