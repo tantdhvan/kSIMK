@@ -1,0 +1,621 @@
+#ifndef ALGS_CPP
+#define ALGS_CPP
+
+#include "mygraph.cpp"
+#include <set>
+#include <map>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <unordered_map>
+
+using namespace std;
+using namespace mygraph;
+
+enum Algs
+{
+	SG,
+	STR
+};
+
+uniform_real_distribution<double> unidist(1e-10, 1);
+
+resultsHandler allResults;
+vector<double> alpha;
+vector<vector<double>> alpha2;
+
+void init_alpha(tinyGraph &g)
+{
+	alpha.assign(g.n, 0.0);
+	alpha2.assign(g.k, vector<double>(g.n, 0.0));
+	mt19937 gen(0); // same sequence each time
+
+	for (node_id u = 0; u < g.n; ++u)
+	{
+		alpha[u] = unidist(gen);
+	}
+	for (int i = 0; i < g.k; i++)
+	{
+		for (node_id u = 0; u < g.n; ++u)
+		{
+			alpha2[i][u] = unidist(gen);
+		}
+	}
+}
+
+struct Args
+{
+	Algs alg;
+	string graphFileName;
+	string outputFileName = "";
+	size_t k = 2;
+	tinyGraph g;
+	double tElapsed;
+	double wallTime;
+	double B;
+	Logger logg;
+	bool steal = true;
+	double epsi = 0.1;
+	double delta = 0.1;
+	double c = 1;
+	size_t N = 1;
+	size_t P = 10;
+	bool plusplus = false;
+	double tradeoff = 0.5;
+	bool quiet = false;
+};
+
+class MyPair
+{
+public:
+	node_id u;
+	double gain; // may be negative
+
+	MyPair() {}
+	MyPair(node_id a,
+		   double g)
+	{
+		u = a;
+		gain = g;
+	}
+
+	MyPair(const MyPair &rhs)
+	{
+		u = rhs.u;
+		gain = rhs.gain;
+	}
+
+	void operator=(const MyPair &rhs)
+	{
+		u = rhs.u;
+		gain = rhs.gain;
+	}
+};
+
+struct gainLT
+{
+	bool operator()(const MyPair &p1, const MyPair &p2)
+	{
+		return p1.gain < p2.gain;
+	}
+} gainLTobj;
+
+struct revgainLT
+{
+	bool operator()(const MyPair &p1, const MyPair &p2)
+	{
+		return (p1.gain > p2.gain);
+	}
+} revgainLTobj;
+
+vector<bool> emptySetVector;
+
+#ifndef REVMAX // Nghia la MAXCOV
+size_t marge(size_t &nEvals, tinyGraph &g, node_id u, vector<bool> &set,
+			 vector<bool> &cov = emptySetVector)
+{
+	if (set[u])
+		return 0;
+
+	++nEvals;
+
+	return g.getDegreeMinusSet(u, cov) + 1;
+}
+
+size_t compute_valSet(size_t &nEvals, tinyGraph &g, vector<bool> &set,
+					  vector<bool> &cov = emptySetVector)
+{
+	++nEvals;
+	cov.assign(g.n, false);
+	size_t val = 0;
+	for (node_id u = 0; u < g.n; ++u)
+	{
+		if (set[u])
+		{
+			if (!cov[u])
+			{
+				cov[u] = true;
+				val += 1;
+			}
+			vector<tinyEdge> &neis = g.adjList[u].neis;
+			for (size_t j = 0; j < neis.size(); ++j)
+			{
+				node_id v = neis[j].target;
+				if (!cov[v])
+				{
+					cov[v] = true;
+					val += 1;
+				}
+			}
+		}
+	}
+
+	return val;
+}
+
+size_t compute_valSet(size_t &nEvals, tinyGraph &g, vector<node_id> &set)
+{
+	++nEvals;
+	vector<bool> cov(g.n, false);
+
+	size_t val = 0;
+	for (size_t i = 0; i < set.size(); ++i)
+	{
+		node_id u = set[i];
+		if (!cov[u])
+		{
+			cov[u] = true;
+			val += 1;
+		}
+		vector<tinyEdge> &neis = g.adjList[u].neis;
+		for (size_t j = 0; j < neis.size(); ++j)
+		{
+			node_id v = neis[j].target;
+			if (!cov[v])
+			{
+				cov[v] = true;
+				val += 1;
+			}
+		}
+	}
+
+	return val;
+}
+#else // REVMAX
+double compute_valSet(size_t &nEvals, tinyGraph &g, vector<bool> &set, vector<bool> &cov = emptySetVector)
+{
+	if (alpha.size() == 0)
+	{
+		init_alpha(g);
+	}
+
+	++nEvals;
+	cov.assign(g.n, false);
+	double val = 0;
+
+	for (node_id u = 0; u < g.n; ++u)
+	{
+		vector<tinyEdge> &neis = g.adjList[u].neis;
+		double valU = 0.0;
+		for (size_t j = 0; j < neis.size(); ++j)
+		{
+			node_id v = neis[j].target;
+			if (set[v])
+			{
+				valU += neis[j].weight;
+			}
+		}
+		valU = pow(valU, alpha[u]);
+		val += valU;
+	}
+
+	return val;
+}
+
+double compute_valSet(size_t &nEvals, tinyGraph &g, vector<kpoint> &sset)
+{
+	if (alpha.size() == 0)
+	{
+		init_alpha(g);
+	}
+	vector<vector<bool>> set(g.k, vector<bool>(g.n, false));
+#pragma omp parallel for
+	for (size_t i = 0; i < sset.size(); ++i)
+	{
+		set[sset[i].second][sset[i].first] = true;
+	}
+
+	++nEvals;
+
+	double val = 0;
+#pragma omp parallel for
+	for (int p = 0; p < g.k; p++)
+	{
+#pragma omp parallel for
+		for (node_id u = 0; u < g.n; ++u)
+		{
+			vector<tinyEdge> &neis = g.adjList[u].neis;
+			double valU = 0.0;
+			for (size_t j = 0; j < neis.size(); ++j)
+			{
+				node_id v = neis[j].target;
+				if (set[p][v])
+				{
+					valU += neis[j].weight;
+				}
+			}
+			valU = pow(valU, alpha2[p][u]);
+#pragma omp critical
+			{
+				val += valU;
+			}
+		}
+	}
+	return val;
+}
+double marge(size_t &nEvals, tinyGraph &g, vector<kpoint> &sset, kpoint x)
+{
+	if (alpha.size() == 0)
+	{
+		init_alpha(g);
+	}
+	vector<vector<bool>> set(g.k, vector<bool>(g.n, false));
+#pragma omp parallel for
+	for (size_t i = 0; i < sset.size(); ++i)
+	{
+		set[sset[i].second][sset[i].first] = true;
+	}
+	if (set[x.second][x.first])
+		return 0;
+
+	vector<tinyEdge> &neis = g.adjList[x.first].neis;
+	double gain = 0.0;
+#pragma omp parallel for reduction(+ : gain)
+	for (size_t j = 0; j < neis.size(); ++j)
+	{
+		node_id v = neis[j].target;
+		vector<tinyEdge> &neisV = g.adjList[v].neis;
+		double valV = 0.0;
+		double valVwithX = 0.0;
+		for (size_t k = 0; k < neisV.size(); ++k)
+		{
+			node_id w = neisV[k].target;
+			if (w != x.first)
+			{
+				if (set[x.second][w])
+				{
+					valV += neisV[k].weight;
+					valVwithX += neisV[k].weight;
+				}
+			}
+			else
+			{
+				valVwithX += neisV[k].weight;
+			}
+		}
+
+		if (valV == 0)
+			gain += pow(valVwithX, alpha2[x.second][v]);
+		else
+			gain += pow(valVwithX, alpha2[x.second][v]) - pow(valV, alpha2[x.second][v]);
+	}
+	++nEvals;
+	return gain;
+}
+double compute_valSet(size_t &nEvals, tinyGraph &g, vector<node_id> &sset)
+{
+	if (alpha.size() == 0)
+	{
+		init_alpha(g);
+	}
+	vector<bool> set(g.n, false);
+	for (size_t i = 0; i < sset.size(); ++i)
+	{
+		set[sset[i]] = true;
+	}
+
+	++nEvals;
+
+	double val = 0;
+
+	for (node_id u = 0; u < g.n; ++u)
+	{
+		vector<tinyEdge> &neis = g.adjList[u].neis;
+		double valU = 0.0;
+		for (size_t j = 0; j < neis.size(); ++j)
+		{
+			node_id v = neis[j].target;
+			if (set[v])
+			{
+				valU += neis[j].weight;
+			}
+		}
+		valU = pow(valU, alpha[u]);
+		val += valU;
+	}
+
+	return val;
+}
+
+double marge(size_t &nEvals, tinyGraph &g, node_id x, vector<bool> &set, vector<bool> &cov = emptySetVector)
+{
+	if (alpha.size() == 0)
+	{
+		init_alpha(g);
+	}
+
+	if (set[x])
+		return 0;
+
+	vector<tinyEdge> &neis = g.adjList[x].neis;
+	double gain = 0.0;
+	for (size_t j = 0; j < neis.size(); ++j)
+	{
+		node_id v = neis[j].target;
+		vector<tinyEdge> &neisV = g.adjList[v].neis;
+		double valV = 0.0;
+		double valVwithX = 0.0;
+		for (size_t k = 0; k < neisV.size(); ++k)
+		{
+			node_id w = neisV[k].target;
+			if (w != x)
+			{
+				if (set[w])
+				{
+					valV += neisV[k].weight;
+					valVwithX += neisV[k].weight;
+				}
+			}
+			else
+			{
+				valVwithX += neisV[k].weight;
+			}
+		}
+
+		if (valV == 0)
+			gain += pow(valVwithX, alpha[v]);
+		else
+			gain += pow(valVwithX, alpha[v]) - pow(valV, alpha[v]);
+	}
+	++nEvals;
+	return gain;
+}
+
+#endif
+
+void reportResults(size_t nEvals, size_t obj, size_t maxMem = 0)
+{
+	allResults.add("obj", obj);
+	allResults.add("nEvals", nEvals);
+	allResults.add("mem", maxMem);
+}
+
+// Standard Greedy
+class Sg
+{
+	size_t k;
+	double B;
+	double b;
+	tinyGraph &g;
+	size_t nEvals = 0;
+	double eps;
+
+public:
+	Sg(Args &args) : g(args.g)
+	{
+		k = args.k;
+		b = args.B;
+		B = args.B * g.total_cost;
+		eps = args.epsi;
+	}
+
+	void run()
+	{
+		init_alpha(g);
+		nEvals = 0;
+		vector<kpoint> seedsf;
+		int no_nodes = g.n;
+		vector<bool> v(no_nodes, false);
+		double C_S[] = {0.0, 0.0, 0.0};
+		
+		while (true)
+		{
+			int i_max = -1, e_max = -1;
+			double delta = 0;
+			#pragma omp parallel for
+			for (int e = 0; e < no_nodes; e++)
+			{
+				if (v[e] == true) continue;
+				#pragma omp parallel for
+				for (int i = 0; i < g.k; i++)
+				{
+					if (C_S[i] + g.adjList[e].wht > B) continue;
+					double tmp_delta = marge(nEvals, g, seedsf, kpoint(e, i))/ g.adjList[e].wht;
+					if (tmp_delta > delta)
+					{
+						#pragma omp critical
+						{
+							e_max = e;
+							i_max = i;
+							delta = tmp_delta;
+						}
+					}
+				}
+			}
+			if (i_max == -1 || e_max == -1) break;
+			seedsf.push_back(kpoint(e_max, i_max));
+			C_S[i_max] += g.adjList[e_max].wht;
+			v[e_max] = true;
+		}
+		double current_f_s = compute_valSet(nEvals, g, seedsf);
+		cout << "Greedy," << b << "," << B << "," << current_f_s << "," << nEvals;
+	}
+};
+
+class Streaming
+{
+	size_t k;
+	double B;
+	double b;
+	tinyGraph &g;
+	size_t nEvals = 0;
+	double eps;
+
+public:
+	Streaming(Args &args) : g(args.g)
+	{
+		k = args.k;
+		b = args.B;
+		B = args.B * g.total_cost;
+		eps = args.epsi;
+	}
+
+	void run()
+	{
+		init_alpha(g);
+		nEvals = 0;
+		vector<kpoint> seedsf;
+		int no_nodes = g.n;
+
+		double alpha = 0.25;
+		vector<myType> nguong;
+		vector<int> nguongj;
+		int e_max = -1, i_max = -1;
+		double f_e_i_max = -1;
+		size_t count = 0;
+		for (int e = 0; e < no_nodes; e++)
+		{
+			int i_m = -1;
+			double f_i = -1;
+			#pragma omp parallel for
+			for (int i = 0; i < g.k; i++)
+			{
+				vector<kpoint> tmp_seeds1;
+				double tmp_f = marge(nEvals, g, tmp_seeds1,kpoint(e, i));
+
+				if (tmp_f > f_i)
+				{
+					#pragma omp critical
+					{
+						i_m = i;
+						f_i = tmp_f;
+					}
+				}
+			}
+			if (f_i > f_e_i_max)
+			{
+				e_max = e;
+				i_max = i_m;
+				f_e_i_max = f_i;
+				int j = 0;
+				while (true)
+				{
+					double tmp = pow((1 + eps), j);
+					if (tmp > f_e_i_max * B * g.k) break;
+					if (tmp >= f_e_i_max)
+					{
+						auto it = std::find(nguongj.begin(), nguongj.end(), j);
+						if (it == nguongj.end())
+						{
+							myType tmp_ng;
+							tmp_ng.nguong = j;
+							tmp_ng.nguongd = tmp;
+							tmp_ng.cost = {0.0, 0.0, 0.0};
+							tmp_ng.check = vector<bool>(no_nodes, false);
+							nguong.push_back(tmp_ng);
+							nguongj.push_back(j);
+						}
+					}
+					j++;
+				}
+			}
+
+			#pragma omp parallel for
+			for (int t = 0; t < nguong.size(); t++)
+			{
+				myType &nguongt = nguong[t];
+				if (nguongt.nguongd < f_e_i_max) continue;
+				double delta=0;
+				int iv_max = -1;
+				#pragma omp parallel for
+				for (int i = 0; i < g.k; i++)
+				{
+					if (nguongt.cost[i] + g.adjList[e].wht > B) continue;
+					double tmp_delta = marge(nEvals, g, nguongt.s, kpoint(e, i));
+					if (tmp_delta > delta)
+					{
+						#pragma opm critical
+						{
+							iv_max = i;
+							delta = tmp_delta;
+						}
+					}
+				}
+				if (iv_max != -1)
+				{
+					if (delta >= g.adjList[e].wht * alpha * nguongt.nguongd / B)
+					{
+						#pragma omp critical
+						{
+							nguongt.s.push_back(kpoint(e, iv_max));
+							nguongt.cost[iv_max] += g.adjList[e].wht;
+							nguongt.check[e] = true;
+						}
+					}
+				}
+			}
+		}
+		for (int e = 0; e < no_nodes; e++)
+		{
+			#pragma omp parallel for
+			for (int t = 0; t < nguong.size(); t++)
+			{
+				myType &nguongt = nguong[t];
+				if (nguongt.nguongd < f_e_i_max) continue;
+				if (nguongt.check[e] == true) continue;
+				int imax = -1;
+				double delta = 0;
+				#pragma omp parallel for
+				for (int i = 0; i < g.k; i++)
+				{
+					if (nguongt.cost[i] + g.adjList[e].wht > B) continue;
+					double tmp_delta = marge(nEvals, g, nguongt.s, kpoint(e,i));
+					if (tmp_delta> delta)
+					{
+						#pragma omp critical
+						{
+							imax = i;
+							delta = tmp_delta;
+						}
+					}
+				}
+				if (imax != -1)
+				{
+					#pragma omp critical
+					{
+						nguongt.s.push_back(kpoint(e, imax));
+						nguongt.cost[imax] += g.adjList[e].wht;
+						nguongt.check[e] = true;
+					}
+				}
+			}
+		}
+		double result = 0;
+		int k_max = -1;
+		#pragma omp parallel for
+		for (int i = 0; i < nguong.size(); i++)
+		{
+			if(nguong[i].nguongd < f_e_i_max) continue;
+			double f_tmp=compute_valSet(nEvals, g, nguong[i].s);
+			if (f_tmp > result)
+			{
+				#pragma omp critical
+				{
+					result = f_tmp;
+				}
+			}
+		}
+		cout << "Streaming," << b << "," << B << "," << result << "," << nEvals;
+	}
+};
+#endif
