@@ -377,6 +377,8 @@ namespace mygraph
 		uint32_t target;
 		double weight;
 
+		vector<double> prob_influence;
+
 		node_id getId() const
 		{
 			return target & bitMask;
@@ -944,6 +946,7 @@ namespace mygraph
 					ifile.read((char *)&w, sizeof(double));
 					adjList[i].neis[j].target = nei_id;
 					adjList[i].neis[j].weight = w;
+					adjList[i].neis[j].prob_influence.assign(k,0);
 				}
 			}
 

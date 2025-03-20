@@ -23,6 +23,7 @@ uniform_real_distribution<double> unidist(1e-10, 1);
 resultsHandler allResults;
 vector<double> alpha;
 vector<vector<double>> alpha2;
+int numSimulations=1000;
 
 void init_alpha(tinyGraph &g)
 {
@@ -40,7 +41,7 @@ void init_alpha(tinyGraph &g)
 		{
 			alpha2[i][u] = unidist(gen);
 		}
-	}
+	}	
 }
 
 struct Args
@@ -110,76 +111,95 @@ struct revgainLT
 
 vector<bool> emptySetVector;
 
-#ifndef REVMAX // Nghia la MAXCOV
-size_t marge(size_t &nEvals, tinyGraph &g, node_id u, vector<bool> &set,
-			 vector<bool> &cov = emptySetVector)
-{
-	if (set[u])
-		return 0;
+#ifndef IM //hàm f(.) cho bài toán tối đa ảnh hưởng
+size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
+    std::vector<bool> active(g.n, false);
+    for (kpoint node : S) {
+        active[node.first] = true;
+    }
 
-	++nEvals;
+    std::queue<kpoint> queue;
+    for (kpoint node : S) {
+        queue.push(node);
+    }
 
-	return g.getDegreeMinusSet(u, cov) + 1;
-}
+    while (!queue.empty()) {
+        kpoint u = queue.front();
+        queue.pop();
 
-size_t compute_valSet(size_t &nEvals, tinyGraph &g, vector<bool> &set,
-					  vector<bool> &cov = emptySetVector)
-{
-	++nEvals;
-	cov.assign(g.n, false);
-	size_t val = 0;
-	for (node_id u = 0; u < g.n; ++u)
-	{
-		if (set[u])
-		{
-			if (!cov[u])
-			{
-				cov[u] = true;
-				val += 1;
-			}
-			vector<tinyEdge> &neis = g.adjList[u].neis;
-			for (size_t j = 0; j < neis.size(); ++j)
-			{
-				node_id v = neis[j].target;
-				if (!cov[v])
-				{
-					cov[v] = true;
-					val += 1;
-				}
-			}
-		}
-	}
-
-	return val;
-}
-
-size_t compute_valSet(size_t &nEvals, tinyGraph &g, vector<node_id> &set)
-{
-	++nEvals;
-	vector<bool> cov(g.n, false);
-
-	size_t val = 0;
-	for (size_t i = 0; i < set.size(); ++i)
-	{
-		node_id u = set[i];
-		if (!cov[u])
-		{
-			cov[u] = true;
-			val += 1;
-		}
-		vector<tinyEdge> &neis = g.adjList[u].neis;
+		vector<tinyEdge> &neis = g.adjList[u.first].neis;
 		for (size_t j = 0; j < neis.size(); ++j)
 		{
 			node_id v = neis[j].target;
-			if (!cov[v])
-			{
-				cov[v] = true;
-				val += 1;
-			}
-		}
-	}
 
-	return val;
+			if (!active[v]) {
+                double randNum = unidist(gen);
+                if (randNum <= neis[j].prob_influence[u.second]) {
+                    active[v] = true;
+                    queue.push(kpoint(v, u.second));
+                }
+            }			
+		}       
+    }
+    int count = 0;
+    for (bool a : active) {
+        if (a) count++;
+    }
+    return count;
+}
+size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
+    std::vector<bool> active(g.n, false);
+	int count_old=0;
+    for (kpoint node : S) {
+		count_old++;
+        active[node.first] = true;
+    }
+	if(active[e.first]) return 0;
+	active[e.first] = true;
+
+    std::queue<kpoint> queue;
+    queue.push(e);
+
+    while (!queue.empty()) {
+        kpoint u = queue.front();
+        queue.pop();
+		vector<tinyEdge> &neis = g.adjList[u.first].neis;
+		for (size_t j = 0; j < neis.size(); ++j)
+		{
+			node_id v = neis[j].target;
+			if (!active[v]) {
+                double randNum = unidist(gen);
+                if (randNum <= neis[j].prob_influence[u.second]) {
+                    active[v] = true;
+                    queue.push(kpoint(v, u.second));
+                }
+            }
+		}       
+    }
+    int count = 0;
+    for (bool a : active) {
+        if (a) count++;
+    }
+    return count-count_old;
+}
+double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
+	nEvals++;
+    double total = 0;
+	
+	#pragma omp parallel for reduction(+ : total)
+    for (int i = 0; i < numSimulations; i++) {
+        total += simulate(g,S);
+    }
+    return total / numSimulations;
+}
+double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e){
+	nEvals++;
+    double total = 0;
+	#pragma omp parallel for reduction(+ : total)
+    for (int i = 0; i < numSimulations; i++) {
+        total += simulate(g,S);
+    }
+    return total / numSimulations;
 }
 #else // REVMAX
 double compute_valSet(size_t &nEvals, tinyGraph &g, vector<bool> &set, vector<bool> &cov = emptySetVector)
