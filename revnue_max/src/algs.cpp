@@ -131,7 +131,6 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
 		for (size_t j = 0; j < neis.size(); ++j)
 		{
 			node_id v = neis[j].target;
-
 			if (!active[v]) {
                 double randNum = unidist(gen);
                 if (randNum <= neis[j].prob_influence[u.second]) {
@@ -155,11 +154,14 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 	if(active[e.first]) return 0;
 	active[e.first] = true;
 
+    //std::queue<pair<kpoint,double>> queue;
     std::queue<kpoint> queue;
+    //queue.push(make_pair(e,1.0));
     queue.push(e);
 	int count = 0;
     while (!queue.empty()) {
-        kpoint u = queue.front();
+		kpoint u = queue.front();
+		//double prob = queue.front().second;
         queue.pop();
 		vector<tinyEdge> &neis = g.adjList[u.first].neis;
 		for (size_t j = 0; j < neis.size(); ++j)
@@ -167,7 +169,6 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 			node_id v = neis[j].target;
 			if (!active[v]) {
                 double randNum = unidist(gen);
-				cout<<"randNum: "<<randNum<<" prob:"<<neis[j].prob_influence[u.second]<<endl;
                 if (randNum <= neis[j].prob_influence[u.second]) {
                     active[v] = true;
 					count++;
@@ -176,7 +177,7 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
             }
 		}       
     }
-	cout<<"count: "<<count<<endl;
+	//cout<<"count: "<<count<<endl;
     return count;
 }
 double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
@@ -186,6 +187,7 @@ double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S);
     }
+	cout<<"f: "<<total / numSimulations<<endl;
     return total / numSimulations;
 }
 double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e){
@@ -195,6 +197,7 @@ double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e){
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S,e);
     }
+	cout<<"marge: "<<total / numSimulations<<endl;
     return total / numSimulations;
 }
 #else // REVMAX
