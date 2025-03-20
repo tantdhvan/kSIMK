@@ -910,6 +910,8 @@ namespace mygraph
 
 		void read_bin(string fname)
 		{
+			mt19937 gen(0); // same sequence each time
+			uniform_real_distribution<double> unidist(1e-10, 1);
 			this->adjList.clear();
 			this->m = 0;
 			this->n = 0;
@@ -947,6 +949,10 @@ namespace mygraph
 					adjList[i].neis[j].target = nei_id;
 					adjList[i].neis[j].weight = w;
 					adjList[i].neis[j].prob_influence.assign(k,0);
+					for(int l=0;l<k;l++)
+					{
+						adjList[i].neis[j].prob_influence[l]=unidist(gen);
+					}
 				}
 			}
 

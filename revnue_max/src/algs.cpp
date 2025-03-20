@@ -23,7 +23,7 @@ uniform_real_distribution<double> unidist(1e-10, 1);
 resultsHandler allResults;
 vector<double> alpha;
 vector<vector<double>> alpha2;
-int numSimulations=1000;
+int numSimulations=100;
 
 void init_alpha(tinyGraph &g)
 {
@@ -149,9 +149,7 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
 }
 size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
     std::vector<bool> active(g.n, false);
-	int count_old=0;
     for (kpoint node : S) {
-		count_old++;
         active[node.first] = true;
     }
 	if(active[e.first]) return 0;
@@ -159,7 +157,7 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 
     std::queue<kpoint> queue;
     queue.push(e);
-
+	int count = 0;
     while (!queue.empty()) {
         kpoint u = queue.front();
         queue.pop();
@@ -169,23 +167,21 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 			node_id v = neis[j].target;
 			if (!active[v]) {
                 double randNum = unidist(gen);
+				cout<<"randNum: "<<randNum<<" prob:"<<neis[j].prob_influence[u.second]<<endl;
                 if (randNum <= neis[j].prob_influence[u.second]) {
                     active[v] = true;
+					count++;
                     queue.push(kpoint(v, u.second));
                 }
             }
 		}       
     }
-    int count = 0;
-    for (bool a : active) {
-        if (a) count++;
-    }
-    return count-count_old;
+	cout<<"count: "<<count<<endl;
+    return count;
 }
 double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
 	nEvals++;
     double total = 0;
-	
 	#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S);
@@ -197,7 +193,7 @@ double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e){
     double total = 0;
 	#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
-        total += simulate(g,S);
+        total += simulate(g,S,e);
     }
     return total / numSimulations;
 }
@@ -449,6 +445,7 @@ public:
 				{
 					if (C_S[i] + g.adjList[e].wht > B) continue;
 					double tmp_delta = marge(nEvals, g, seedsf, kpoint(e, i))/ g.adjList[e].wht;
+					//cout<<"tmp_delta: "<<tmp_delta<<endl;
 					if (tmp_delta > delta)
 					{
 						{
