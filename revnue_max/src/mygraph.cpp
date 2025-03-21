@@ -911,7 +911,7 @@ namespace mygraph
 		void read_bin(string fname)
 		{
 			mt19937 gen(0); // same sequence each time
-			uniform_real_distribution<double> unidist(1e-10,0.5);
+			uniform_real_distribution<double> unidist(1e-10,0.2);
 			this->adjList.clear();
 			this->m = 0;
 			this->n = 0;

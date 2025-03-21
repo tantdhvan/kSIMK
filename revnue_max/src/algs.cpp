@@ -23,7 +23,7 @@ uniform_real_distribution<double> unidist(1e-10, 1);
 resultsHandler allResults;
 vector<double> alpha;
 vector<vector<double>> alpha2;
-int numSimulations=100;
+int numSimulations=2000;
 
 void init_alpha(tinyGraph &g)
 {
@@ -113,32 +113,42 @@ vector<bool> emptySetVector;
 
 #ifndef IM //hàm f(.) cho bài toán tối đa ảnh hưởng
 size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
+	std::random_device rd;  // Sinh số ngẫu nhiên từ phần cứng
+    std::mt19937 gen(rd()); // Mersenne Twister 19937
+    std::uniform_real_distribution<double> dist(0.0, 1.0); // Phân phối đều từ 0 đến 1
+
+    // Sinh số ngẫu nhiên
+    //double random_number = dist(gen);
     std::vector<bool> active(g.n, false);
     for (kpoint node : S) {
         active[node.first] = true;
     }
 
-    std::queue<kpoint> queue;
+    std::queue<pair<kpoint,double>> queue;
     for (kpoint node : S) {
-        queue.push(node);
+        queue.push(make_pair(node,1));
     }
 
     while (!queue.empty()) {
-        kpoint u = queue.front();
+        kpoint u = queue.front().first;
+		double prob = queue.front().second;
         queue.pop();
-
+		int count_u=0;
 		vector<tinyEdge> &neis = g.adjList[u.first].neis;
 		for (size_t j = 0; j < neis.size(); ++j)
 		{
 			node_id v = neis[j].target;
 			if (!active[v]) {
-                double randNum = unidist(gen);
-                if (randNum <= neis[j].prob_influence[u.second]) {
+                double randNum = dist(gen);
+                if (randNum <= neis[j].prob_influence[u.second]*prob) {
                     active[v] = true;
-                    queue.push(kpoint(v, u.second));
+                    queue.push(make_pair(kpoint(v, u.second),neis[j].prob_influence[u.second]));
+					count_u++;
+					//cout<<"randNum: "<<randNum<<" prob: "<<neis[j].prob_influence[u.second]*prob<<endl;
                 }
             }			
-		}       
+		}
+		//cout<<"So dinh kich hoat cua nut "<<u.first<<" la: "<<count_u<<endl;       
     }
     int count = 0;
     for (bool a : active) {
@@ -161,6 +171,8 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 	int count = 0;
     while (!queue.empty()) {
 		kpoint u = queue.front();
+		cout<<"u: "<<u.first<<endl;
+		int count_u=0;
 		//double prob = queue.front().second;
         queue.pop();
 		vector<tinyEdge> &neis = g.adjList[u.first].neis;
@@ -169,36 +181,48 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 			node_id v = neis[j].target;
 			if (!active[v]) {
                 double randNum = unidist(gen);
+				//cout<<"randNum: "<<randNum<<" prob: "<<neis[j].prob_influence[u.second]<<endl;
                 if (randNum <= neis[j].prob_influence[u.second]) {
                     active[v] = true;
 					count++;
+					count_u++;
                     queue.push(kpoint(v, u.second));
                 }
             }
-		}       
+		}
+		//cout<<"So dinh kich hoat cua nut "<<u.first<<" la: "<<count_u<<endl;
     }
 	//cout<<"count: "<<count<<endl;
     return count;
 }
 double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
 	nEvals++;
+	if(S.size()==0) return 0;
     double total = 0;
 	#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S);
     }
-	cout<<"f: "<<total / numSimulations<<endl;
+	//cout<<"f: "<<total / numSimulations<<endl;
     return total / numSimulations;
 }
 double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e){
-	nEvals++;
-    double total = 0;
+	//nEvals++;
+    /*double total = 0;
 	#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S,e);
     }
 	cout<<"marge: "<<total / numSimulations<<endl;
     return total / numSimulations;
+	*/
+	double compute_valSet1 = compute_valSet(nEvals,g,S);
+	//cout<<"compute_valSet1: "<<compute_valSet1<<endl;
+	vector<kpoint> S1 = S;
+	S1.push_back(e);
+	double compute_valSet2 = compute_valSet(nEvals,g,S1);
+	//cout<<"compute_valSet2: "<<compute_valSet2<<endl;
+	return compute_valSet2 - compute_valSet1;
 }
 #else // REVMAX
 double compute_valSet(size_t &nEvals, tinyGraph &g, vector<bool> &set, vector<bool> &cov = emptySetVector)
@@ -431,15 +455,17 @@ public:
 	void run()
 	{
 		init_alpha(g);
+		cout<<"Start greedy"<<endl;
 		nEvals = 0;
 		vector<kpoint> seedsf;
 		int no_nodes = g.n;
 		vector<bool> v(no_nodes, false);
 		double C_S[] = {0.0, 0.0, 0.0};
-		
+		double f=0;
 		while (true)
 		{
 			int i_max = -1, e_max = -1;
+			double max_f=0;
 			double delta = 0;
 			for (int e = 0; e < no_nodes; e++)
 			{
@@ -447,20 +473,28 @@ public:
 				for (int i = 0; i < g.k; i++)
 				{
 					if (C_S[i] + g.adjList[e].wht > B) continue;
-					double tmp_delta = marge(nEvals, g, seedsf, kpoint(e, i))/ g.adjList[e].wht;
+					seedsf.push_back(kpoint(e, i));
+					double tmp_f = compute_valSet(nEvals, g, seedsf);
+					seedsf.pop_back();
+					//cout<<"tmp_f: "<<tmp_f<<endl;
+					//cout<<"tmp_f: "<<tmp_f<<endl;
+					double tmp_delta = (tmp_f-f)/ g.adjList[e].wht;
+					//double tmp_delta = marge(nEvals, g, seedsf, kpoint(e, i))/ g.adjList[e].wht;
 					//cout<<"tmp_delta: "<<tmp_delta<<endl;
 					if (tmp_delta > delta)
 					{
-						{
-							e_max = e;
-							i_max = i;
-							delta = tmp_delta;
-						}
+						e_max = e;
+						i_max = i;
+						delta = tmp_delta;
+						max_f = tmp_f;
 					}
 				}
+				//cout<<"e: "<<e<<" i_max: "<<i_max<<" delta: "<<delta<<" max_f: "<<max_f<<endl;
 			}
+			cout<<"e_max: "<<e_max<<" i_max: "<<i_max<<" delta: "<<delta<<" max_f: "<<max_f<<endl;
 			if (i_max == -1 || e_max == -1) break;
 			seedsf.push_back(kpoint(e_max, i_max));
+			f=max_f;
 			C_S[i_max] += g.adjList[e_max].wht;
 			v[e_max] = true;
 		}

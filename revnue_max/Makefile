@@ -3,9 +3,9 @@ CPPFLAGS=-std=c++11 -Wall -O2
 all: im revmax preproc
 
 im: src/main.cpp src/mygraph.cpp src/algs.cpp
-	g++ src/main.cpp -o im  ${CPPFLAGS} -DREVMAX
+	g++ src/main.cpp -o im -fopenmp ${CPPFLAGS} -DREVMAX
 revmax: src/main.cpp src/mygraph.cpp src/algs.cpp
-	g++ src/main.cpp -o revmax  ${CPPFLAGS} -DIM
+	g++ src/main.cpp -o revmax -fopenmp ${CPPFLAGS} -DIM
 debug: src/main.cpp src/mygraph.cpp src/algs.cpp
 	g++ src/main.cpp -o maxcov_debug -std=c++11 -Wall -Og -g
 revmax-debug: src/main.cpp src/mygraph.cpp src/algs.cpp
