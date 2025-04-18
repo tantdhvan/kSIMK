@@ -23,7 +23,7 @@ uniform_real_distribution<double> unidist(1e-10, 1);
 resultsHandler allResults;
 vector<double> alpha;
 vector<vector<double>> alpha2;
-int numSimulations=1;
+int numSimulations=100;
 
 void init_alpha(tinyGraph &g)
 {
@@ -113,7 +113,7 @@ vector<bool> emptySetVector;
 
 #ifndef IM //hàm f(.) cho bài toán tối đa ảnh hưởng
 size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
-	cout<<"start simulate"<<endl;
+	//cout<<"start simulate"<<endl;
 	std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -133,7 +133,6 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
         kpoint u = queue.front().first;
 		double prob = queue.front().second;
         queue.pop();
-		int count_u=0;
 		vector<tinyEdge> &neis = g.adjList[u.first].neis;
 		if(neis.size()==0) continue;
 		for (size_t j = 0; j < neis.size(); ++j)
@@ -145,7 +144,6 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
             if (randNum <= neis[j].prob_influence[u.second]*prob) {
                 active[v] = true;
                 queue.push(make_pair(kpoint(v, u.second),neis[j].prob_influence[u.second]));
-				count_u++;
             }
 		}
 		dem++;
@@ -155,7 +153,7 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
     for (bool a : active) {
         if (a) count++;
     }
-	cout<<"end simulate"<<endl;
+	//cout<<"end simulate"<<endl;
     return count;
 }
 size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
@@ -192,15 +190,15 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
     return count;
 }
 double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
-	cout<<"start compute_valSet"<<endl;
+	//cout<<"start compute_valSet"<<endl;
 	nEvals++;
 	if(S.size()==0) return 0;
     double total = 0;
-	//#pragma omp parallel for reduction(+ : total)
+	#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S);
     }
-	cout<<"end compute_valSet"<<endl;
+	//cout<<"end compute_valSet"<<endl;
     return total / numSimulations;
 
 }
@@ -445,6 +443,7 @@ public:
 	{
 		init_alpha(g);
 		cout<<"Start greedy"<<endl;
+		cout<<"B: "<<B<<endl;
 		nEvals = 0;
 		vector<kpoint> seedsf;
 		int no_nodes = g.n;
@@ -456,19 +455,18 @@ public:
 			int i_max = -1, e_max = -1;
 			double max_f=0;
 			double delta = 0;
-			//#pragma omp parallel for
+			#pragma omp parallel for
 			for (int e = 0; e < no_nodes; e++)
 			{
 				if (v[e] == true) continue;
-				//#pragma omp prallel for
 				for (int i = 0; i < g.k; i++)
 				{
 					if (C_S[i] + g.adjList[e].wht > B) continue;
-					seedsf.push_back(kpoint(e, i));
-					double tmp_f = compute_valSet(nEvals, g, seedsf);
-					seedsf.pop_back();
+					vector<kpoint> tmpseed=seedsf;
+					tmpseed.push_back(kpoint(e, i));
+					double tmp_f = compute_valSet(nEvals, g, tmpseed);
 					double tmp_delta = (tmp_f-f)/ g.adjList[e].wht;
-					//#pragma omp critical
+					#pragma omp critical
 					{
 						if (tmp_delta > delta)
 						{
@@ -479,7 +477,6 @@ public:
 						}
 					}
 				}
-				//cout<<"e: "<<e<<" max_f: "<<max_f<<endl;
 			}
 			cout<<"e_max: "<<e_max<<" i_max: "<<i_max<<" delta: "<<delta<<" max_f: "<<max_f<<endl;
 			if (i_max == -1 || e_max == -1) break;
@@ -487,6 +484,9 @@ public:
 			f=max_f;
 			C_S[i_max] += g.adjList[e_max].wht;
 			v[e_max] = true;
+			for(int i=0;i<g.k;i++)
+				cout<<"C_S["<<i<<"]: "<<C_S[i]<<" ";
+			cout<<endl;
 		}
 		cout << "Greedy," << b << "," << B << "," << f << "," << nEvals;
 	}
