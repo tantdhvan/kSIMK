@@ -23,7 +23,7 @@ uniform_real_distribution<double> unidist(1e-10, 1);
 resultsHandler allResults;
 vector<double> alpha;
 vector<vector<double>> alpha2;
-int numSimulations=4000;
+int numSimulations=1;
 
 void init_alpha(tinyGraph &g)
 {
@@ -113,9 +113,10 @@ vector<bool> emptySetVector;
 
 #ifndef IM //hàm f(.) cho bài toán tối đa ảnh hưởng
 size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
-	std::random_device rd;  // Sinh số ngẫu nhiên từ phần cứng
-    std::mt19937 gen(rd()); // Mersenne Twister 19937
-    std::uniform_real_distribution<double> dist(0.0, 1.0); // Phân phối đều từ 0 đến 1
+	cout<<"start simulate"<<endl;
+	std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
 
     std::vector<bool> active(g.n, false);
     for (kpoint node : S) {
@@ -126,33 +127,39 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S) {
     for (kpoint node : S) {
         queue.push(make_pair(node,1.0));
     }
-
+	map<int,map<int,bool>> visited;
+	int dem=0;
     while (!queue.empty()) {
         kpoint u = queue.front().first;
 		double prob = queue.front().second;
         queue.pop();
 		int count_u=0;
 		vector<tinyEdge> &neis = g.adjList[u.first].neis;
+		if(neis.size()==0) continue;
 		for (size_t j = 0; j < neis.size(); ++j)
 		{
 			node_id v = neis[j].target;
-			if (!active[v]) {
-                double randNum = dist(gen);
-                if (randNum <= neis[j].prob_influence[u.second]*prob) {
-                    active[v] = true;
-                    queue.push(make_pair(kpoint(v, u.second),neis[j].prob_influence[u.second]));
-					count_u++;
-                }
-            }			
-		}   
+			if(active[v] || visited[u.first][v]) continue;
+			visited[u.first][v]=true;
+            double randNum = dist(gen);
+            if (randNum <= neis[j].prob_influence[u.second]*prob) {
+                active[v] = true;
+                queue.push(make_pair(kpoint(v, u.second),neis[j].prob_influence[u.second]));
+				count_u++;
+            }
+		}
+		dem++;
+		if(dem==g.n) break;
     }
     int count = 0;
     for (bool a : active) {
         if (a) count++;
     }
+	cout<<"end simulate"<<endl;
     return count;
 }
 size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
+	
     std::vector<bool> active(g.n, false);
     for (kpoint node : S) {
         active[node.first] = true;
@@ -185,14 +192,17 @@ size_t simulate(tinyGraph &g, const vector<kpoint>& S,kpoint e) {
     return count;
 }
 double compute_valSet(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S) {
+	cout<<"start compute_valSet"<<endl;
 	nEvals++;
 	if(S.size()==0) return 0;
     double total = 0;
-	#pragma omp parallel for reduction(+ : total)
+	//#pragma omp parallel for reduction(+ : total)
     for (int i = 0; i < numSimulations; i++) {
         total += simulate(g,S);
     }
+	cout<<"end compute_valSet"<<endl;
     return total / numSimulations;
+
 }
 double marge(size_t &nEvals, tinyGraph &g, const vector<kpoint>& S,kpoint e) {
 	nEvals++;
@@ -446,9 +456,11 @@ public:
 			int i_max = -1, e_max = -1;
 			double max_f=0;
 			double delta = 0;
+			//#pragma omp parallel for
 			for (int e = 0; e < no_nodes; e++)
 			{
 				if (v[e] == true) continue;
+				//#pragma omp prallel for
 				for (int i = 0; i < g.k; i++)
 				{
 					if (C_S[i] + g.adjList[e].wht > B) continue;
@@ -456,16 +468,20 @@ public:
 					double tmp_f = compute_valSet(nEvals, g, seedsf);
 					seedsf.pop_back();
 					double tmp_delta = (tmp_f-f)/ g.adjList[e].wht;
-					if (tmp_delta > delta)
+					//#pragma omp critical
 					{
-						e_max = e;
-						i_max = i;
-						delta = tmp_delta;
-						max_f = tmp_f;
+						if (tmp_delta > delta)
+						{
+							e_max = e;
+							i_max = i;
+							delta = tmp_delta;
+							max_f = tmp_f;
+						}
 					}
 				}
+				//cout<<"e: "<<e<<" max_f: "<<max_f<<endl;
 			}
-			cout<<"e_max: "<<e_max<<" i_max: "<<i_max<<" delta: "<<delta<<endl;
+			cout<<"e_max: "<<e_max<<" i_max: "<<i_max<<" delta: "<<delta<<" max_f: "<<max_f<<endl;
 			if (i_max == -1 || e_max == -1) break;
 			seedsf.push_back(kpoint(e_max, i_max));
 			f=max_f;
