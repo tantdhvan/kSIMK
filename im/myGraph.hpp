@@ -19,7 +19,7 @@ class myGraph
 public:
     struct EdgeProperty
     {
-        std::vector<double> topic_weights; // 3 trọng số cho 3 chủ đề
+        std::vector<double> topic_weights;
         EdgeProperty() : topic_weights(3, 0.0) {}
     };
 
@@ -35,7 +35,7 @@ public:
 
 private:
     Graph g;
-    boost::random::mt19937 rng; // Bộ sinh số ngẫu nhiên
+    boost::random::mt19937 rng;
     int simulations = 1000;
 
 public:
@@ -51,7 +51,6 @@ public:
         return g;
     }
 
-    // Đọc đồ thị từ file
     bool readGraphFromFile(const std::string &filename)
     {
         std::ifstream infile(filename);
@@ -62,10 +61,9 @@ public:
         }
 
         std::vector<std::pair<int, int>> edges;
-        std::unordered_set<int> vertices; // Để lưu các đỉnh thực tế
+        std::unordered_set<int> vertices;
         int u, w;
 
-        // Đọc danh sách các cạnh và xác định các đỉnh thực tế
         while (infile >> u >> w)
         {
             edges.emplace_back(u, w);
@@ -74,20 +72,16 @@ public:
         }
         infile.close();
 
-        // Tạo ánh xạ từ số thứ tự cũ sang số thứ tự mới
         std::unordered_map<int, int> old_to_new;
         int new_index = 0;
 
-        // Đánh lại số thứ tự cho các đỉnh, chỉ xét các đỉnh trong vertices
         for (int vertex : vertices)
         {
             old_to_new[vertex] = new_index++;
         }
 
-        // Tạo đồ thị mới với số đỉnh thực tế
         g = Graph(vertices.size());
 
-        // Thêm các cạnh vào đồ thị mới, sử dụng số thứ tự đỉnh mới
         for (const auto &edge : edges)
         {
             int new_u = old_to_new[edge.first];
@@ -95,7 +89,6 @@ public:
             boost::add_edge(new_u, new_v, g);
         }
 
-        // Gán trọng số ngẫu nhiên cho các đỉnh
         boost::random::uniform_real_distribution<double> dist(0.0, 1.0);
         auto v = boost::vertices(g);
         for (auto it = v.first; it != v.second; ++it)
@@ -103,7 +96,6 @@ public:
             g[*it].weight = dist(rng);
         }
 
-        // Gán trọng số ngẫu nhiên cho các cạnh
         auto e = boost::edges(g);
         for (auto it = e.first; it != e.second; ++it)
         {
@@ -125,24 +117,22 @@ public:
             return false;
         }
 
-        // Ghi các đỉnh và trọng số của chúng (ghi theo định dạng mà readGraphFromFileWithWeights có thể đọc)
         outfile << boost::num_vertices(g) << " " << boost::num_edges(g) << std::endl;
         auto v = boost::vertices(g);
         for (auto it = v.first; it != v.second; ++it)
         {
-            outfile << *it << " " << g[*it].weight << std::endl; // Ghi theo định dạng: id weight
+            outfile << *it << " " << g[*it].weight << std::endl;
         }
 
-        // Ghi các cạnh và trọng số của chúng (3 trọng số cho mỗi cạnh)
         auto e = boost::edges(g);
         for (auto it = e.first; it != e.second; ++it)
         {
             Vertex u = boost::source(*it, g);
             Vertex v = boost::target(*it, g);
-            outfile << u << " " << v; // Ghi theo định dạng: u v
+            outfile << u << " " << v;
             for (int i = 0; i < 3; ++i)
             {
-                outfile << " " << g[*it].topic_weights[i]; // Ghi trọng số của các chủ đề
+                outfile << " " << g[*it].topic_weights[i];
             }
             outfile << std::endl;
         }
@@ -160,22 +150,19 @@ public:
             return false;
         }
 
-        int u, v; // Các đỉnh u và v
+        int u, v;
         double vertex_weight;
-        double edge_weights[3]; // Trọng số cho 3 chủ đề mỗi cạnh
+        double edge_weights[3];
         int max_vertex = -1;
         int n, m;
         infile >> n >> m;
-        // Đọc các đỉnh và trọng số của chúng
         for (int i = 0; i < n; i++)
         {
             infile >> u >> vertex_weight;
-            // Thêm đỉnh vào đồ thị nếu nó chưa tồn tại
             while (boost::num_vertices(g) <= u)
             {
-                boost::add_vertex(g); // Thêm đỉnh vào đồ thị
+                boost::add_vertex(g);
             }
-            // Gán trọng số cho đỉnh u
             g[u].weight = vertex_weight;
             max_vertex = std::max(max_vertex, u);
         }
@@ -194,7 +181,6 @@ public:
         return true;
     }
 
-    // Tính mức độ ảnh hưởng của tập hạt giống
     double computeInfluence(const std::vector<std::pair<int, int>> &seeds)
     {
         double total_influence = 0.0;
@@ -222,7 +208,6 @@ public:
     }
     void printGraph() const
     {
-        // In các đỉnh và trọng số của chúng
         std::cout << "Vertices and their weights:" << std::endl;
         auto v = boost::vertices(g);
         for (auto it = v.first; it != v.second; ++it)
@@ -230,7 +215,6 @@ public:
             std::cout << *it << " " << g[*it].weight << std::endl;
         }
 
-        // In các cạnh và trọng số của chúng
         std::cout << "Edges and their topic weights:" << std::endl;
         auto e = boost::edges(g);
         for (auto it = e.first; it != e.second; ++it)
@@ -240,20 +224,19 @@ public:
             std::cout << u << " " << v;
             for (int i = 0; i < 3; ++i)
             {
-                std::cout << " " << g[*it].topic_weights[i]; // Ghi trọng số của các chủ đề
+                std::cout << " " << g[*it].topic_weights[i];
             }
             std::cout << std::endl;
         }
     }
 
 private:
-    // Chạy một lần mô phỏng ICM
     double runICMSimulation(const std::vector<std::pair<int, int>> &seeds,
                             boost::random::mt19937 &rng)
     {
         std::queue<std::pair<int, int>> q;
-        std::set<std::pair<int, int>> active;                      // giữ các đỉnh đã lan truyền
-        boost::random::uniform_real_distribution<> dist(0.0, 1.0); // phân phối đều [0,1]
+        std::set<std::pair<int, int>> active;                      
+        boost::random::uniform_real_distribution<> dist(0.0, 1.0);
 
         for (const auto &seed : seeds)
         {
@@ -269,17 +252,15 @@ private:
             int u = current.first;
             int topic = current.second;
 
-            // Duyệt các cạnh ra từ u
             auto out_edges = boost::out_edges(u, g);
             for (auto it = out_edges.first; it != out_edges.second; ++it)
             {
                 int v = boost::target(*it, g);
                 std::pair<int, int> neighbor = {v, topic};
 
-                // Nếu đỉnh v (theo topic) chưa bị ảnh hưởng
                 if (active.find(neighbor) == active.end())
                 {
-                    double prob = g[*it].topic_weights[topic]; // xác suất lan theo topic
+                    double prob = g[*it].topic_weights[topic];
                     double random_val = dist(rng);
 
                     if (random_val <= prob)
