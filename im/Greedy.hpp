@@ -16,10 +16,11 @@ public:
         std::vector<std::pair<int, int>> seedSet;
         std::vector<bool> selected(graph.num_vertices(), false);
         std::vector<double> topicWeights(3, 0.0);
-
+        double currentInfluence = 0.0;
         while (true)
         {
             double maxInfluence = -1;
+            double maxDeltaInfluence = -1;
             int bestNode = -1;
             int bestTopic = -1;
 
@@ -31,12 +32,16 @@ public:
                     {
                         if (topicWeights[topic] + graph.getGraph()[node].weight <= b)
                         {
-                            double influence = computeInfluenceForNode(node, topic, max_simulations);
-                            if (influence > maxInfluence)
+                            std::vector<std::pair<int, int>> seeds = seedSet;
+                            seeds.push_back({node, topic});
+                            double influence = graph.computeInfluence(seeds);
+                            double deltaInfluence = (influence - currentInfluence)/graph.getGraph()[node].weight;
+                            if (deltaInfluence > maxDeltaInfluence)
                             {
-                                maxInfluence = influence;
+                                maxDeltaInfluence = deltaInfluence;
                                 bestNode = node;
                                 bestTopic = topic;
+                                maxInfluence=influence;
                             }
                         }
                     }
@@ -51,6 +56,7 @@ public:
             selected[bestNode] = true;
             seedSet.push_back({bestNode, bestTopic});
             topicWeights[bestTopic] += graph.getGraph()[bestNode].weight;
+            currentInfluence = maxInfluence;
             cout<<"maxInfluence:"<<maxInfluence<<" best weight:"<<graph.getGraph()[bestNode].weight<<endl;
             cout<<topicWeights[0]<<" "<<topicWeights[1]<<" "<<topicWeights[2]<<endl;
         }
@@ -61,12 +67,6 @@ public:
 private:
     myGraph &graph;
     double b;
-
-    double computeInfluenceForNode(int node, int topic, int simulations)
-    {
-        std::vector<std::pair<int, int>> seeds = {{node, topic}};
-        return graph.computeInfluence(seeds, simulations);
-    }
 };
 
 #endif // GREEDY_HPP
