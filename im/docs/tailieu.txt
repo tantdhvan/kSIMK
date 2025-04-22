@@ -1,0 +1,15 @@
+
+Hãy dùng thư viện boost để xây dựng 1 class có các chức năng:
+- đọc vào 1 đồ thị có hướng chỉ có danh sách cạnh u v từ file vào thành 1 đồ thị
+Đối với 1 cạnh thì tạo ngẫu nhiên 1 bộ có 3 trọng số từ 0->1 (đại diện cho việc 3 topic được lan truyền)
+Mỗi một đỉnh u sẽ có 1 trọng số ngẫu nhiên từ cũng từ 0->1
+-	Tính mức độ ảnh hưởng của một tập hạt giống đối với 1 chủ đề theo mô hình IC
+ 
+
+hãy đổi InfluenceGraph thành myGraph
+tập hạt giống tôi muốn lưu thành: vector<pair<int,int>>:
+trong đó 1 pair thì:
+	+ first là 1 node
+	+ second là chủ đề thứ (0,1,2)
+	Lưu ý mỗi một node sẽ chỉ được kích hoạt bởi 1 chủ đề thôi
+

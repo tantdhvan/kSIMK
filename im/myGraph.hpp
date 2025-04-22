@@ -51,6 +51,9 @@ public:
         return g;
     }
 
+    /// @brief đọc đồ thị từ file với danh sách cạnh không có trọng số sau đó sinh ra file đồ thị chuẩn hóa
+    /// @param filename 
+    /// @return 
     bool readGraphFromFile(const std::string &filename)
     {
         std::ifstream infile(filename);
