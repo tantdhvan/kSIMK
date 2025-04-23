@@ -3,8 +3,8 @@ from typing import Union, Set, List, Tuple, Dict
 import numpy as np
 from itertools import chain
 
-from .Graph import Graph
-from .utils import multiple_union
+from Graph import Graph
+from utils import multiple_union
 
 __all__ = ["PseudoTraces", "Traces", "Trace"]
 
