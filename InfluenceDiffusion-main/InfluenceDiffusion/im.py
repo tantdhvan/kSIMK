@@ -45,7 +45,8 @@ def single_simulation(model, seed_set,seed_set_with_topics):
     total_influenced = len(set.union(*trace_steps))
     return total_influenced
 
-def estimate_influence(model, seed_set,seed_set_with_topics, num_simulations=100):
+def estimate_influence(model, seed_set,seed_set_with_topics):
+    num_simulations=1000
     with Pool(processes=cpu_count()) as pool:
         results = pool.starmap(single_simulation, [(model, seed_set,seed_set_with_topics)] * num_simulations)
 
@@ -87,58 +88,58 @@ def greedy_influence(model,node_weights,b,n_topics=3):
         seed_set_weights[max_topic] += node_weights[max_node][max_topic]
     end_time=time.time()
     return current_f,count_f,end_time-start_time
-def get_Emax(model,node,n_topics=3):
-    topic_max=-1
-    max_f=-1
-    for topic in range(n_topics):
-            tmp_seed=[node]
-            tmp_seed_set_with_topics={node:topic}
-            tmp_f = estimate_influence(model, tmp_seed,tmp_seed_set_with_topics)
-            if tmp_f>max_f:
-                max_f=tmp_f
-                topic_max=topic
-    return topic_max,max_f
-def get_threshold(M, epsilon, b, n_topics):
-    print(M, ',', epsilon, ',', b, ',', n_topics)
+def get_Emax(model,node):
+    tmp_seed=[node]
+    tmp_seed_set_with_topics={node:0}
+    tmp_f = estimate_influence(model, tmp_seed,tmp_seed_set_with_topics)
+    return tmp_f
+def get_threshold(M, epsilon, b, weight, n_topics):
     threshold = {}
     j = -1
     while True:
         j = j + 1
         tmp_threshold = (1 + epsilon) ** j
-        print('tmp_threshold: ',tmp_threshold,' M: ',M,' j:',j)
-        if tmp_threshold > M * b * n_topics:
+        if tmp_threshold > M * b * n_topics/weight:
             break  # kiểm tra kết thúc trước
         if tmp_threshold >= M:
-            print('Saved: ',tmp_threshold, ',', j)
             threshold[j] = tmp_threshold  # lưu nếu thỏa điều kiện
-    print(threshold, ',', j)
     return threshold
         
 
 def streaming(model,node_weights,b,epsilon,alpha,n_topics=3):
     start_time=time.time()
     M=0.0
-    threshold={}
+    
     seed_sets={}
     seed_sets_with_topics={}
     seed_sets_weights={}
     seed_sets_current_f={}
+    dict_f={}
     count_f=0
+    f_emax=0
+    node_max=-1
+    topic_emax=-1
     for node in g.nodes:
-        #print('---- node: ',node)
-        node_topic_max,node_max_f=get_Emax(model,node,n_topics)
-        M=max(M,node_max_f)
-        threshold=get_threshold(M,epsilon,b,n_topics)
-        print(threshold)
-        count_f=count_f+n_topics
-        for j,threshold_j in threshold.items():
-            if j not in seed_sets:
-                seed_sets[j]=[]
-                seed_sets_with_topics[j]={}
-                seed_sets_current_f[j]=0.0
-                seed_sets_weights[j]={}
-                for topic in range(n_topics):
-                    seed_sets_weights[j][topic]=0.0
+        tmp_f=get_Emax(model,node)
+        count_f=count_f+1
+        for topic in range(n_topics):
+            if(tmp_f/node_weights[node][topic]>f_emax):
+                f_emax=tmp_f/node_weights[node][topic]
+                node_max=node
+                topic_emax=topic
+                M=tmp_f
+    threshold=get_threshold(M,epsilon,b,node_weights[node_max][topic_emax],n_topics)
+    for j in threshold.keys():
+        seed_sets[j]=[]
+        seed_sets_with_topics[j]={}
+        seed_sets_current_f[j]=0.0
+        seed_sets_weights[j]={}
+        for topic in range(n_topics):
+            seed_sets_weights[j][topic]=0.0
+
+    print('thresholds size: ', len(threshold))
+    for node in g.nodes:
+        for j,threshold_j in threshold.items():                
             for topic in range(n_topics):
                 if(seed_sets_weights[j][topic] + node_weights[node][topic] > b):
                     continue
@@ -156,6 +157,7 @@ def streaming(model,node_weights,b,epsilon,alpha,n_topics=3):
                     seed_sets_current_f[j]=tmp_f
     end_time=time.time()
     return max(max(seed_sets_current_f.values()),M),count_f,end_time-start_time
+
 filename= 'graph.pkl'
 file_node_weights ='nodes_graph.pkl'
 g,node_weights = get_or_create_graph(filename,file_node_weights,n_nodes=100,p=0.1)
