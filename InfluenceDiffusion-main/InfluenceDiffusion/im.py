@@ -94,6 +94,7 @@ def greedy_influence(model,b,n_topics=3):
         seed_set.append(max_node)
         seed_set_with_topics[max_node]=max_topic
         seed_set_weights[max_topic] += model.g.nodes[node]['weight']
+        print(seed_set,seed_set_with_topics,seed_set_weights)
     end_time=time.time()
     return current_f,count_f,round(end_time-start_time,1)
 def get_Emax(model,node):
@@ -207,7 +208,7 @@ def streaming(model,node_weights,b,epsilon,alpha,n_topics=3):
     end_time=time.time()
     return max(max(seed_sets_current_f.values()),M),count_f,round(end_time-start_time,1)
 n_nodes=500
-p=0.05
+p=0.1
 filename= 'graph_'+str(n_nodes)+'_'+str(p)+'.pkl'
 g = get_or_create_graph(filename,n_nodes=n_nodes,p=p)
 n_topics=3
@@ -215,9 +216,21 @@ epsilon=0.2
 B=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
 alpha=0.2
 modelICM = kICM(g,n_topics=n_topics)
-for b in B:
+'''
+seed_set_with_topics: dict[int, int] = {}
+seed_set_with_topics[0]=0
+seed_set_with_topics[1]=1
+seed_set_with_topics[2]=2
+seed_set_with_topics[400]=0
+
+print('S: ',seed_set_with_topics)
+
+f=modelICM.sample_trace(seed_set_with_topics)
+print(f)
+'''
+#for b in B:
     #f_str,count_f_str,time_str=streaming(modelICM,node_weights,b,epsilon,alpha,n_topics=n_topics)
     #print('Streaming,',b,',',f_str,',',count_f_str,',',time_str)
-    f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,b,n_topics=n_topics)
-    print('Greedy,',b,',',f_greedy,',',count_f_greedy,',',time_greedy)
+f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,b=0.1,n_topics=n_topics)
+print('Greedy,',0.1,',',f_greedy,',',count_f_greedy,',',time_greedy)
 
