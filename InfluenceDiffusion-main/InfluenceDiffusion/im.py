@@ -54,7 +54,7 @@ def single_simulation(model,seed_set_with_topics):
 def estimate_influence(model,seed_set_with_topics:dict[int,int]):
 
     assert isinstance(seed_set_with_topics, dict), "estimate_influence: seed_set_with_topics should always be a dictionary after update."
-    num_simulations=1000
+    num_simulations=100
     with Pool(processes=cpu_count()) as pool:
         results = pool.starmap(single_simulation, [(model,seed_set_with_topics)] * num_simulations)
 
@@ -207,7 +207,7 @@ def streaming(model,node_weights,b,epsilon,alpha,n_topics=3):
                     seed_topics[j]=tmp_seed_topics
     end_time=time.time()
     return max(max(seed_sets_current_f.values()),M),count_f,round(end_time-start_time,1)
-n_nodes=500
+n_nodes=100
 p=0.1
 filename= 'graph_'+str(n_nodes)+'_'+str(p)+'.pkl'
 g = get_or_create_graph(filename,n_nodes=n_nodes,p=p)
