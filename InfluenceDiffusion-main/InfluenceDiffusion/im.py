@@ -47,9 +47,10 @@ def get_or_create_graph(filename, n_nodes, p):
         g = create_graph(n_nodes, p)
         save_graph(g, filename)
         return g
-def single_simulation(model,seed_set_with_topics):
+def single_simulation(model, seed_set_with_topics):
     trace_steps = model.sample_trace(seed_set_with_topics)
-    total_influenced = len(set.union(*trace_steps))
+    step_sets = [set(step.keys()) for step in trace_steps]
+    total_influenced = len(set.union(*step_sets))
     return total_influenced
 def estimate_influence(model,seed_set_with_topics:dict[int,int]):
 
@@ -61,7 +62,6 @@ def estimate_influence(model,seed_set_with_topics:dict[int,int]):
     return sum(results) / num_simulations
 def greedy_influence(model,b,n_topics=3):
     start_time=time.time()
-    seed_set = []
     seed_set_weights = [0.0,0.0,0.0]
     seed_set_with_topics: dict[int, int] = {}
     current_f=0
@@ -72,7 +72,7 @@ def greedy_influence(model,b,n_topics=3):
         max_f=0
         max_delta=-1
         for node in g.nodes:
-            if node in seed_set:
+            if node in seed_set_with_topics.keys():
                 continue
             for topic in range(n_topics):
                 if(seed_set_weights[topic] + model.g.nodes[node]['weight'] > b):
@@ -91,10 +91,9 @@ def greedy_influence(model,b,n_topics=3):
         if max_node==-1 or max_topic==-1:
             break
         current_f=max_f
-        seed_set.append(max_node)
         seed_set_with_topics[max_node]=max_topic
-        seed_set_weights[max_topic] += model.g.nodes[node]['weight']
-        print(seed_set,seed_set_with_topics,seed_set_weights)
+        seed_set_weights[max_topic] += model.g.nodes[max_node]['weight']
+        print(seed_set_with_topics,seed_set_weights)
     end_time=time.time()
     return current_f,count_f,round(end_time-start_time,1)
 def get_Emax(model,node):
@@ -231,6 +230,6 @@ print(f)
 #for b in B:
     #f_str,count_f_str,time_str=streaming(modelICM,node_weights,b,epsilon,alpha,n_topics=n_topics)
     #print('Streaming,',b,',',f_str,',',count_f_str,',',time_str)
-f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,b=0.1,n_topics=n_topics)
-print('Greedy,',0.1,',',f_greedy,',',count_f_greedy,',',time_greedy)
+f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,b=1.0,n_topics=n_topics)
+print('Greedy,',1.0,',',f_greedy,',',count_f_greedy,',',time_greedy)
 
