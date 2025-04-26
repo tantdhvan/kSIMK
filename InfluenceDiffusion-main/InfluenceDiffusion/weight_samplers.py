@@ -1,7 +1,7 @@
 import numpy as np
 
-from .Graph import Graph
-from .utils import random_vector_inside_simplex, random_vector_on_simplex
+from graph import Graph
+from utils import random_vector_inside_simplex, random_vector_on_simplex
 
 __all__ = ["make_weighted_cascade_weights", "make_random_weights_with_indeg_constraint",
            "make_random_weights_with_fixed_indeg"]

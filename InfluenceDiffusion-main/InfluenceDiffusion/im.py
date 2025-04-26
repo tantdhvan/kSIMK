@@ -5,24 +5,32 @@ from multiprocessing import cpu_count, Pool
 import networkx as nx
 import pickle
 import random
+import numpy as np
 import time
 from influence_models import kICM
-from InfluenceDiffusion.Graph import Graph
-from InfluenceDiffusion.weight_samplers import make_random_weights_with_indeg_constraint
+from graph import Graph
+from weight_samplers import make_random_weights_with_indeg_constraint
 
 
 def create_graph(n_nodes, p,n_topics=3, directed=True):
     indeg_ub = 1
     g_nx = nx.erdos_renyi_graph(n_nodes, p, directed=directed)
+
     g = Graph(g_nx.edges)
-    true_weights = make_random_weights_with_indeg_constraint(g, indeg_ub=indeg_ub, random_state=None)
+    topic_weights={}
+    true_weights=[]
+    for topic in range(n_topics):
+        topic_weights[topic] = make_random_weights_with_indeg_constraint(g, indeg_ub=indeg_ub, random_state=None)
+    true_weights = np.zeros((g.count_edges(), n_topics))
+    for i, edge in enumerate(g.get_edges()):
+        for topic in range(n_topics):
+            true_weights[i][topic] = float(topic_weights[topic][i])
+
+    # Cập nhật trọng số cho các cạnh trong đồ thị
     g.set_weights(true_weights)
-    node_weights = {}
-    for v in range(n_nodes):
-        node_weights[v] = [0,0,0]
-        for i in range(n_topics):
-            node_weights[v][i] = round(random.uniform(0.0001, 1),4)
-    return g,node_weights
+    print("Đồ thị tạo ra:", true_weights)
+    return g
+
 def save_graph(graph, filename):
     with open(filename, 'wb') as f:
         pickle.dump(graph, f)
@@ -30,27 +38,28 @@ def save_graph(graph, filename):
 def load_graph(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
-def get_or_create_graph(filename,filename_node_weights, n_nodes, p):
-    if os.path.exists(filename) and os.path.exists(filename_node_weights):
+def get_or_create_graph(filename, n_nodes, p):
+    if os.path.exists(filename):
         print("Tải đồ thị từ file...")
-        return load_graph(filename), load_graph(filename_node_weights)
+        return load_graph(filename)
     else:
         print("File không tồn tại, tạo mới đồ thị và lưu vào file...")
-        g,node_weights = create_graph(n_nodes, p)
+        g = create_graph(n_nodes, p)
         save_graph(g, filename)
-        save_graph(node_weights, filename_node_weights)
-        return g,node_weights
-def single_simulation(model, seed_set,seed_set_with_topics):
-    trace_steps = model.sample_trace(seed_set,seed_set_with_topics, out_trace_type=False)
+        return g
+def single_simulation(model,seed_set_with_topics):
+    trace_steps = model.sample_trace(seed_set_with_topics)
     total_influenced = len(set.union(*trace_steps))
     return total_influenced
-def estimate_influence(model, seed_set,seed_set_with_topics):
+def estimate_influence(model,seed_set_with_topics:dict[int,int]):
+
+    assert isinstance(seed_set_with_topics, dict), "estimate_influence: seed_set_with_topics should always be a dictionary after update."
     num_simulations=1000
     with Pool(processes=cpu_count()) as pool:
-        results = pool.starmap(single_simulation, [(model, seed_set,seed_set_with_topics)] * num_simulations)
+        results = pool.starmap(single_simulation, [(model,seed_set_with_topics)] * num_simulations)
 
     return sum(results) / num_simulations
-def greedy_influence(model,node_weights,b,n_topics=3):
+def greedy_influence(model,b,n_topics=3):
     start_time=time.time()
     seed_set = []
     seed_set_weights = [0.0,0.0,0.0]
@@ -66,15 +75,14 @@ def greedy_influence(model,node_weights,b,n_topics=3):
             if node in seed_set:
                 continue
             for topic in range(n_topics):
-                if(seed_set_weights[topic] + node_weights[node][topic] > b):
+                if(seed_set_weights[topic] + model.g.nodes[node]['weight'] > b):
                     continue
-                tmp_seed=deepcopy(seed_set)
                 tmp_seed_set_with_topics=deepcopy(seed_set_with_topics)
-                tmp_seed.append(node)
                 tmp_seed_set_with_topics[node]=topic
-                tmp_f = estimate_influence(model, tmp_seed,tmp_seed_set_with_topics)
+
+                tmp_f = estimate_influence(model,tmp_seed_set_with_topics)
                 count_f=count_f+1
-                tmp_delta = (tmp_f - current_f)/node_weights[node][topic]
+                tmp_delta = (tmp_f - current_f)/model.g.nodes[node]['weight']
                 if tmp_delta>max_delta:
                     max_f=tmp_f
                     max_node=node
@@ -85,13 +93,12 @@ def greedy_influence(model,node_weights,b,n_topics=3):
         current_f=max_f
         seed_set.append(max_node)
         seed_set_with_topics[max_node]=max_topic
-        seed_set_weights[max_topic] += node_weights[max_node][max_topic]
+        seed_set_weights[max_topic] += model.g.nodes[node]['weight']
     end_time=time.time()
     return current_f,count_f,round(end_time-start_time,1)
 def get_Emax(model,node):
-    tmp_seed=[node]
     tmp_seed_set_with_topics={node:0}
-    tmp_f = estimate_influence(model, tmp_seed,tmp_seed_set_with_topics)
+    tmp_f = estimate_influence(model,tmp_seed_set_with_topics)
     return tmp_f
 def get_threshold(M, epsilon, b, weight, n_topics):
     threshold = {}
@@ -202,16 +209,15 @@ def streaming(model,node_weights,b,epsilon,alpha,n_topics=3):
 n_nodes=500
 p=0.05
 filename= 'graph_'+str(n_nodes)+'_'+str(p)+'.pkl'
-file_node_weights ='nodes_graph_'+str(n_nodes)+'_'+str(p)+'.pkl'
-g,node_weights = get_or_create_graph(filename,file_node_weights,n_nodes=n_nodes,p=p)
+g = get_or_create_graph(filename,n_nodes=n_nodes,p=p)
 n_topics=3
 epsilon=0.2
 B=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
 alpha=0.2
 modelICM = kICM(g,n_topics=n_topics)
 for b in B:
-    f_str,count_f_str,time_str=streaming(modelICM,node_weights,b,epsilon,alpha,n_topics=n_topics)
-    print('Streaming,',b,',',f_str,',',count_f_str,',',time_str)
-    f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,node_weights,b,n_topics=n_topics)
+    #f_str,count_f_str,time_str=streaming(modelICM,node_weights,b,epsilon,alpha,n_topics=n_topics)
+    #print('Streaming,',b,',',f_str,',',count_f_str,',',time_str)
+    f_greedy,count_f_greedy,time_greedy=greedy_influence(modelICM,b,n_topics=n_topics)
     print('Greedy,',b,',',f_greedy,',',count_f_greedy,',',time_greedy)
 

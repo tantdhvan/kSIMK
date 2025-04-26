@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Tuple, Union, Dict
 import networkx as nx
+import random
 
 __all__ = ["Graph"]
 
@@ -8,7 +9,8 @@ class Graph(nx.DiGraph):
     def __init__(self, incoming_graph_data=None, weights: Union[List, np.array] = None, n_topics: int = 1, **attr):
         super().__init__(incoming_graph_data, **attr)
         self.edge_array = np.array(self.edges)
-        
+        for node in self.nodes:
+            self.nodes[node]['weight'] = round(random.uniform(0.0001, 1), 4)
         # Nếu không có trọng số được cung cấp, tạo một mảng trọng số với kích thước n_topic
         if weights is None:
             self.weights = np.ones((len(self.edges), n_topics))  # Trọng số cho mỗi cạnh là một mảng với n_topic
@@ -18,7 +20,7 @@ class Graph(nx.DiGraph):
         
         # Lưu trọng số theo kiểu mảng cho mỗi cạnh
         nx.set_edge_attributes(self, {edge: weight.tolist() for edge, weight in zip(self.edges, self.weights)}, "weight")
-
+    '''
     def add_edge(self, u_of_edge, v_of_edge, weights: Union[List, np.array] = None, **attr):
         super().add_edge(u_of_edge, v_of_edge, **attr)
         self.edge_array = np.array(self.edges)
@@ -39,12 +41,13 @@ class Graph(nx.DiGraph):
         
         if weights is None:
             # Nếu không có trọng số, tạo mảng trọng số với mỗi cạnh có trọng số là mảng tất cả 1s
-            self.weights = np.vstack([self.weights, np.ones(self.weights.shape[1]) for _ in ebunch_to_add])
+            self.weights = np.vstack([np.ones(self.weights.shape[1]) for _ in ebunch_to_add])
         else:
             # Nếu có trọng số, thêm chúng vào mảng trọng số
             self.weights = np.vstack([self.weights, np.array(weights)])
         
         nx.set_edge_attributes(self, {edge: weight.tolist() for edge, weight in zip(self.edges, self.weights)}, "weight")
+
 
     def add_weighted_edges_from(self, ebunch_to_add, weight='weight', weights: Union[List, np.array] = None, **attr):
         super().add_weighted_edges_from(ebunch_to_add, weight=weight, **attr)
@@ -56,7 +59,7 @@ class Graph(nx.DiGraph):
             self.weights = np.vstack([self.weights, np.array(weights)])
         
         nx.set_edge_attributes(self, {edge: weight.tolist() for edge, weight in zip(self.edges, self.weights)}, "weight")
-
+    '''
     def set_weights(self, weights: Union[List, np.array]) -> "Graph":
         """
         Cập nhật trọng số cho các cạnh trong đồ thị.
