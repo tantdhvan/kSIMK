@@ -200,7 +200,7 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
                     seed_topics[j]=tmp_seed_topics
     end_time=time.time()
     return max(max(seed_sets_current_f.values()),M),count_f,round(end_time-start_time,1)
-n_nodes=100
+n_nodes=500
 p=0.1
 filename= 'graph_'+str(n_nodes)+'_'+str(p)+'.pkl'
 g = get_or_create_graph(filename,n_nodes=n_nodes,p=p)
