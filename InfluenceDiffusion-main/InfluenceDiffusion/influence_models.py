@@ -3,7 +3,7 @@ from copy import deepcopy
 from scipy import stats
 from scipy.stats._distn_infrastructure import rv_frozen
 from typing import Dict, Set, Union, List
-from joblib import Parallel, delayed
+
 
 from graph import Graph
 
@@ -20,7 +20,8 @@ class kInfluenceModel:
         self.n_topics = n_topics
         if check_init:
             self.check_param_init_correctness()
-
+    def getNodeWeight(self,node):
+        return self.g.nodes[node]['weight']
     def check_param_init_correctness(self) -> None:
         """Check the correctness of the model's parameters."""
         raise NotImplementedError
@@ -96,7 +97,7 @@ class kInfluenceModel:
         assert isinstance(self._cur_influence_nodes, dict), "self._cur_influence_nodes should always be a dictionary"
         for v, topic in self._cur_influence_nodes.items():
             for v_adj in self.g.get_children(v).difference(self.all_influenced_nodes.keys()):
-                influence_res = self._make_edge_influence_attempt(v, v_adj, topic)  # Now we pass the topic
+                influence_res = self._make_edge_influence_attempt(v, v_adj, topic)
                 if influence_res:
                     new_influence_nodes[v_adj] = topic
         self._cur_influence_nodes=deepcopy(new_influence_nodes)

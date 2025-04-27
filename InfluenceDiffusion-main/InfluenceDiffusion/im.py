@@ -122,9 +122,9 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
     count_f=0
     f_emax=0
     node_emax=-1
-    topic_emax=-1
+    #topic_emax=-1
     for node in g.nodes:
-        if g.nodes[node]['weight']>b:
+        if model.getNodeWeight(node)>b:
             continue
         for topic in range(n_topics):
             tmp_seed_set_with_topics={}
@@ -137,9 +137,9 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
             if(tmp_f>f_emax):
                 f_emax=tmp_f
                 node_emax=node
-                topic_emax=topic
+                #topic_emax=topic
                 M=tmp_f
-    threshold=get_threshold(M,epsilon,b,model.g.nodes[node_emax]['weight'],n_topics)
+    threshold=get_threshold(M,epsilon,b,model.getNodeWeight(node_emax),n_topics)
     for j in threshold.keys():
         seed_sets_with_topics[j]={}
         seed_sets_current_f[j]=0.0
@@ -151,7 +151,7 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
     for node in g.nodes:
         for j, threshold_j in sorted(threshold.items()):              
             for topic in range(n_topics):
-                if(seed_sets_weights[j][topic] + model.g.nodes[node]['weight'] > b):
+                if(seed_sets_weights[j][topic] + model.getNodeWeight(node) > b):
                     continue
                 tmp_seed_set_with_topics=deepcopy(seed_sets_with_topics[j])
                 tmp_seed_topics=deepcopy(seed_topics[j])
@@ -165,10 +165,10 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
                     count_f=count_f+1
                     hash_f[tmp_hash]=tmp_f
 
-                tmp_delta = (tmp_f - seed_sets_current_f[j])/model.g.nodes[node]['weight']
+                tmp_delta = (tmp_f - seed_sets_current_f[j])/model.getNodeWeight(node)
                 if tmp_delta > threshold_j*alpha/b:
                     seed_sets_with_topics[j]=tmp_seed_set_with_topics
-                    seed_sets_weights[j][topic]=seed_sets_weights[j][topic]+model.g.nodes[node]['weight']
+                    seed_sets_weights[j][topic]=seed_sets_weights[j][topic]+model.getNodeWeight(node)
                     seed_sets_current_f[j]=tmp_f
                     seed_topics[j]=tmp_seed_topics
     
@@ -177,7 +177,7 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
             if node in seed_sets_with_topics[j].keys():
                 continue
             for topic in range(n_topics):
-                if(seed_sets_weights[j][topic] + model.g.nodes[node]['weight'] > b):
+                if(seed_sets_weights[j][topic] + model.getNodeWeight(node) > b):
                     continue
                 tmp_seed_set_with_topics=deepcopy(seed_sets_with_topics[j])
                 tmp_seed_topics=deepcopy(seed_topics[j])
@@ -195,7 +195,7 @@ def streaming(model,b,epsilon,alpha,n_topics=3):
 
                 if tmp_f>seed_sets_current_f[j]:
                     seed_sets_with_topics[j]=tmp_seed_set_with_topics
-                    seed_sets_weights[j][topic]=seed_sets_weights[j][topic]+model.g.nodes[node]['weight']
+                    seed_sets_weights[j][topic]=seed_sets_weights[j][topic]+model.getNodeWeight(node)
                     seed_sets_current_f[j]=tmp_f
                     seed_topics[j]=tmp_seed_topics
     end_time=time.time()
